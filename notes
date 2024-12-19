@@ -1,31 +1,26 @@
 #!/bin/bash
 
-# A bash script `notes` that has the following functions:
-# 1. notes new <note title>
-#   - creates a new .md file ~/notes/misc/<title>.md
-# 2. notes search
-#   - runs the existing shell function `open_notes_with_fzf`
-# 3. notes daily
-#   - checks if ~/notes/daily/YYYY-MM-DD-<Weekday>.md exists
-#   - opens it with vim if it exists
-#   - otherwise copies the template in ~/notes/daily/00-template.md to the above
-#     location, pre-pends `# Daily Notes - Weekday MONTH DD<th|nd> YYYY\n` and opens
-#     with vim
-# 4. notes bucket <optional free text>
-#   - checks if ~/notes/bucket/YYYY/MM.md exists
-#   - creates it and required dir if it does not exist
-#   - appends day and timestamp `[MM-DD HH:MM] ` (note space)
-#   - if there is free text, adds it to the end of the file
-#   - if there is no free text, opens it with vim and cursor at end of file
+# Get the directory of the current script
+SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+
+# Define the path to the configuration file
+CONFIG_FILE="$SCRIPT_DIR/.config"
+
+if [[ -f $CONFIG_FILE ]]; then
+  source $CONFIG_FILE
+else
+  echo "Configuration file for notes was not found: $CONFIG_FILE"
+  exit 1
+fi
 
 function notes() {
-  if [[ $1 = "new" ]]; then
+  if [[ $1 = $NOTES_CMD_NEW ]]; then
     new_note $2
-  elif [[ $1 = "search" ]]; then
+  elif [[ $1 = $NOTES_CMD_SEARCH ]]; then
     open_notes_with_fzf
-  elif [[ $1 = "daily" ]]; then
+  elif [[ $1 = $NOTES_CMD_DAILY ]]; then
     daily_note
-  elif [[ $1 = "bucket" ]]; then
+  elif [[ $1 = $NOTES_CMD_BUCKET ]]; then
     bucket_note "${@:2}"
   fi
 }
@@ -37,7 +32,7 @@ function new_note() {
   fi
 
   local note_title=$1
-  local note_path=~/notes/misc/${note_title}.md
+  local note_path=$NOTES_MISC_DIR/${note_title}.md
 
   if [[ -f $note_path ]]; then
     echo "Note already exists"
@@ -60,39 +55,39 @@ date_with_suffix() {
 }
 
 function daily_note() {
-  local note_path=~/notes/daily/$(date +"%Y-%m-%d-%A").md
+  local note_path=$NOTES_DAILY_DIR/$(date +"%Y-%m-%d-%A").md
   if [[ -f $note_path ]]; then
     vim $note_path
   else
-    last_daily=$(ls -t ~/notes/daily/ | grep -v "template" | head -n 1)
-    cp -f ~/notes/daily/00-template.md $note_path
+    last_daily=$(ls -t $NOTES_DAILY_DIR/ | grep -v "template" | head -n 1)
+    cp -f $NOTES_DAILY_TEMPLATE $note_path
     sed -i '' "s/TEMPLATE_DATE/$(date_with_suffix)/" $note_path
 
-    sed -n '/^### Carry-over$/,/^## Log$/p' "$HOME/notes/daily/$last_daily" | sed '1d;$d;/^$/d' >carry_over_section.tmp
+    sed -n '/^### Carry-over$/,/^## Log$/p' "$NOTES_DAILY_DIR/$last_daily" | sed '1d;$d;/^$/d' >$CARRY_OVER_TMP_FILE
     sed -i '' "/TEMPLATE_CARRY_OVER/{
-    r carry_over_section.tmp
+    r $CARRY_OVER_TMP_FILE
     d
     }" $note_path
-    rm carry_over_section.tmp
+    rm $CARRY_OVER_TMP_FILE
 
     vim $note_path
   fi
 }
 
 function bucket_note() {
-  local note_path=~/notes/bucket/$(date +"%Y/%m").md
+  local note_path=$NOTES_BUCKET_DIR/$(date +"%Y/%m").md
 
   if [[ ! -f $note_path ]]; then
     mkdir -p $(dirname $note_path)
     echo "# Bucket notes $(date +"%Y-%m")\n" >$note_path
   fi
 
-  if [[ $1 != '--read' ]]; then
+  if [[ $1 != $NOTES_BUCKET_CMD_READ ]]; then
     echo -n "- [ $(date +"%Y-%m-%d %H:%M") ] " >>$note_path
     echo "$@" >>$note_path
   fi
 
-  if [[ -z $1 || $1 == '--read' ]]; then
+  if [[ -z $1 || $1 == $NOTES_BUCKET_CMD_READ ]]; then
     vim "+ normal GA" $note_path
   fi
 }
