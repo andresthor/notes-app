@@ -26,7 +26,7 @@ function notes() {
   elif [[ $1 = $NOTES_CMD_FIND ]]; then
     find_notes_with_fzf
   elif [[ $1 = $NOTES_CMD_DAILY ]]; then
-    daily_note
+    daily_note $2
   elif [[ $1 = $NOTES_CMD_BUCKET ]]; then
     bucket_note "${@:2}"
   fi
@@ -62,22 +62,31 @@ date_with_suffix() {
 }
 
 function daily_note() {
-  local note_path=$NOTES_DAILY_DIR/$(date +"%Y-%m-%d-%A").md
-  if [[ -f $note_path ]]; then
-    vim $note_path
+  if [[ ! -z $1 || $1 = 0 ]]; then
+    entry=$((1 - $1))
+    if [[ $1 > 0 ]]; then
+      entry=$((1 + $1))
+    fi
+    entry_name=$(ls -t $NOTES_DAILY_DIR/ | head -n $entry | tail -n 1)
+    vim "$NOTES_DAILY_DIR/$entry_name"
   else
-    last_daily=$(ls -t $NOTES_DAILY_DIR/ | grep -v "template" | head -n 1)
-    cp -f $NOTES_DAILY_TEMPLATE $note_path
-    sed -i '' "s/TEMPLATE_DATE/$(date_with_suffix)/" $note_path
+    local note_path=$NOTES_DAILY_DIR/$(date +"%Y-%m-%d-%A").md
+    if [[ -f $note_path ]]; then
+      vim $note_path
+    else
+      last_daily=$(ls -t $NOTES_DAILY_DIR/ | grep -v "template" | head -n 1)
+      cp -f $NOTES_DAILY_TEMPLATE $note_path
+      sed -i '' "s/TEMPLATE_DATE/$(date_with_suffix)/" $note_path
 
-    sed -n '/^### Carry-over$/,/^## Log$/p' "$NOTES_DAILY_DIR/$last_daily" | sed '1d;$d;/^$/d' >$CARRY_OVER_TMP_FILE
-    sed -i '' "/TEMPLATE_CARRY_OVER/{
-    r $CARRY_OVER_TMP_FILE
-    d
-    }" $note_path
-    rm $CARRY_OVER_TMP_FILE
+      sed -n '/^### Carry-over$/,/^## Log$/p' "$NOTES_DAILY_DIR/$last_daily" | sed '1d;$d;/^$/d' >$CARRY_OVER_TMP_FILE
+      sed -i '' "/TEMPLATE_CARRY_OVER/{
+      r $CARRY_OVER_TMP_FILE
+      d
+      }" $note_path
+      rm $CARRY_OVER_TMP_FILE
 
-    vim $note_path
+      vim $note_path
+    fi
   fi
 }
 
