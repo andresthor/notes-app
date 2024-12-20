@@ -13,6 +13,11 @@ else
   exit 1
 fi
 
+if [[ ! -f $NOTES_DAILY_TEMPLATE ]]; then
+  echo "Couldn't find daily notes template at: $NOTES_DAILY_TEMPLATE"
+  exit 1
+fi
+
 function notes() {
   if [[ $1 = $NOTES_CMD_NEW ]]; then
     new_note $2
