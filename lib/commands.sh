@@ -8,7 +8,7 @@ notes() {
     ;;
   daily)
     shift
-    daily_note "$@"
+    daily_note "${@:-0}"
     ;;
   bucket)
     shift
@@ -16,15 +16,15 @@ notes() {
     ;;
   read)
     shift
-    read_notes "$@"
+    read_notes "${@:-previous}"
     ;;
   search)
     shift
-    search_notes_with_fzf "$@"
+    search_notes_with_fzf "${@:-}"
     ;;
   find)
     shift
-    find_notes_with_fzf "$@"
+    find_notes_with_fzf "${@:-.}"
     ;;
   help | --help | -h) show_help ;;
   *)
@@ -47,16 +47,15 @@ Commands:
     find    Find notes
     help    Show this help message
 
-For more information about a command:
-    notes COMMAND --help
 EOF
 }
 
 read_notes() {
   case "$1" in
-  "${NOTES_CMD_BUCKET}") bucket_read_note "$2" ;;
-  "${NOTES_CMD_DAILY}") daily_note 0 ;;
-  *) ls -t ${NOTES_BASE_DIR}/*/* | head -n 1 | xargs -n 1 nvim ;;
+  bucket) bucket_read_note ;;
+  daily) daily_note 0 ;;
+  previous) ls -t ${NOTES_DIR}/*/* | head -n 1 | xargs -n 1 "$EDITOR" ;;
+  *) echo "'notes read $1' is not a valid command" >&2 ;;
   esac
 }
 
@@ -74,8 +73,7 @@ new_note() {
     return 1
   fi
 
-  touch $note_path
-  vim $note_path
+  "$EDITOR" $note_path
 }
 
 date_with_suffix() {
@@ -90,7 +88,7 @@ date_with_suffix() {
 }
 
 daily_note() {
-  if [[ ! -z $1 || $1 = 0 ]]; then
+  if [[ ! -z "$1" || "$1" = 0 ]]; then
     if ! [[ "$1" =~ ^[-+]?[0-9]+$ ]]; then
       echo "Error: Argument must be a number" >&2
       return 1
@@ -101,7 +99,7 @@ daily_note() {
       entry=$((1 + $1))
     fi
     entry_name=$(ls -t $NOTES_DAILY_DIR/ | head -n $entry | tail -n 1)
-    vim "$NOTES_DAILY_DIR/$entry_name"
+    "$EDITOR" "$NOTES_DAILY_DIR/$entry_name"
   else
     local tmp_file
     tmp_file=$(mktemp) || {
@@ -113,7 +111,7 @@ daily_note() {
     local note_path=$NOTES_DAILY_DIR/$(date +"%Y-%m-%d-%A").md
 
     if [[ -f $note_path ]]; then
-      vim $note_path
+      "$EDITOR" $note_path
     else
       last_daily="$(ls -t "${NOTES_DAILY_DIR}/" | grep -v "template" | head -n 1)"
       cp -f $NOTES_DAILY_TEMPLATE $note_path
@@ -126,24 +124,25 @@ daily_note() {
       }" $note_path
       rm $tmp_file
 
-      vim $note_path
+      "$EDITOR" $note_path
     fi
   fi
 }
 
 bucket_note() {
   local note_path=$NOTES_BUCKET_DIR/$(date +"%Y/%m").md
+  echo "$note_path"
 
   bucket_note_create_if_not_exist "$note_path"
   bucket_append_note "$note_path" "$*"
-  bucket_open "$note_path" "$1"
+  bucket_open "$note_path"
 }
 
 bucket_read_note() {
   local note_path=$NOTES_BUCKET_DIR/$(date +"%Y/%m").md
 
   bucket_note_create_if_not_exist "$note_path"
-  bucket_open "$note_path" "$1"
+  bucket_open "$note_path"
 }
 
 bucket_note_create_if_not_exist() {
@@ -157,19 +156,32 @@ bucket_note_create_if_not_exist() {
 }
 
 bucket_append_note() {
-  if [[ "$2" != "${NOTES_BUCKET_CMD_READ}" ]]; then
-    {
-      printf -- "- [ %s ] " "$(date +"%Y-%m-%d %H:%M")"
-      printf "%s\n" "${@:2}"
-    } >>"$1" || {
-      echo "Error: Failed to write to note" >&2
-      return 1
-    }
-  fi
+  echo "$1"
+  {
+    printf -- "- [ %s ] " "$(date +"%Y-%m-%d %H:%M")"
+    printf "%s\n" "${@:2}"
+  } >>"$1" || {
+    echo "Error: Failed to write to note" >&2
+    return 1
+  }
 }
 
 bucket_open() {
-  if [[ -z $2 || $2 == $NOTES_BUCKET_CMD_READ ]]; then
-    vim "+ normal GA" $1
-  fi
+  "$EDITOR" "+ normal GA" $1
+}
+
+search_notes_with_fzf() {
+  rg --column --no-heading "$1" $NOTES_DIR |
+    fzf --delimiter : \
+      --preview 'bat --color=always --highlight-line {2} {1}' \
+      --preview-window '~3,+{2}+3/2' |
+    awk -F: '{print "+" $2, $1}' |
+    xargs -n 2 nvim
+}
+
+find_notes_with_fzf() {
+  fd -t f -I -L "$1" $NOTES_DIR |
+    fzf --preview 'bat --color=always {}' |
+    awk -F: '{print "+" $2, $1}' |
+    xargs -n 2 nvim
 }

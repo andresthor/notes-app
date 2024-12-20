@@ -1,3 +1,6 @@
+# Default installation directory
+PREFIX="${PREFIX:-$HOME/.local}"
+
 # Notes directories
 NOTES_DIR="${HOME}/notes"
 NOTES_DAILY_DIR="${NOTES_DIR}/daily"

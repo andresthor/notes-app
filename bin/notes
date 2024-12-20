@@ -2,7 +2,7 @@
 
 # Resolve the directory where the script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LIB_DIR="$(cd "${SCRIPT_DIR}/../lib" && pwd)"
+LIB_DIR="$(cd "${SCRIPT_DIR}/../lib/notes" && pwd)"
 SHARE_DIR="$(cd "${SCRIPT_DIR}/../share" && pwd)"
 
 # Source dependencies
