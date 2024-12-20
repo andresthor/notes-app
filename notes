@@ -22,7 +22,9 @@ function notes() {
   if [[ $1 = $NOTES_CMD_NEW ]]; then
     new_note $2
   elif [[ $1 = $NOTES_CMD_SEARCH ]]; then
-    open_notes_with_fzf
+    search_notes_with_fzf
+  elif [[ $1 = $NOTES_CMD_FIND ]]; then
+    find_notes_with_fzf
   elif [[ $1 = $NOTES_CMD_DAILY ]]; then
     daily_note
   elif [[ $1 = $NOTES_CMD_BUCKET ]]; then
