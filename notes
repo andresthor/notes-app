@@ -1,49 +1,51 @@
 #!/bin/bash
+set -euo pipefail
+IFS=$'\n\t'
 
 # Get the directory of the current script
-SCRIPT_DIR="$(dirname "$(realpath "$0")")"
+readonly SCRIPT_DIR="$(dirname "$(realpath "$0")}")" || {
+  echo "Error: Could not determine script directory" >&2
+  exit 1
+}
 
-# Define the path to the configuration file
-CONFIG_FILE="$SCRIPT_DIR/.config"
+# Define the path to the configuration file and source it
+readonly CONFIG_FILE="${SCRIPT_DIR}/.config"
 
-if [[ -f $CONFIG_FILE ]]; then
-  source $CONFIG_FILE
+if [[ -f "$CONFIG_FILE" ]]; then
+  source "$CONFIG_FILE"
 else
   echo "Configuration file for notes was not found: $CONFIG_FILE"
   exit 1
 fi
 
-if [[ ! -f $NOTES_DAILY_TEMPLATE ]]; then
+if [[ ! -f "$NOTES_DAILY_TEMPLATE" ]]; then
   echo "Couldn't find daily notes template at: $NOTES_DAILY_TEMPLATE"
   exit 1
 fi
 
-function notes() {
-  if [[ $1 = $NOTES_CMD_NEW ]]; then
-    new_note $2
-  elif [[ $1 = $NOTES_CMD_SEARCH ]]; then
-    search_notes_with_fzf
-  elif [[ $1 = $NOTES_CMD_FIND ]]; then
-    find_notes_with_fzf
-  elif [[ $1 = $NOTES_CMD_DAILY ]]; then
-    daily_note $2
-  elif [[ $1 = $NOTES_CMD_BUCKET ]]; then
-    bucket_note "${@:2}"
-  fi
+notes() {
+  case "$1" in
+  "${NOTES_CMD_NEW}") new_note "$2" ;;
+  "${NOTES_CMD_SEARCH}") search_notes_with_fzf ;;
+  "${NOTES_CMD_FIND}") find_notes_with_fzf ;;
+  "${NOTES_CMD_DAILY}") daily_note "$2" ;;
+  "${NOTES_CMD_BUCKET}") bucket_note "${@:2}" ;;
+  *) echo "Unknown command: $1" ;;
+  esac
 }
 
-function new_note() {
-  if [[ -z $1 ]]; then
-    echo "Missing note title"
-    return
+new_note() {
+  if [[ -z "$1" ]]; then
+    echo "Missing note title" >&2
+    return 1
   fi
 
   local note_title=$1
   local note_path=$NOTES_MISC_DIR/${note_title}.md
 
   if [[ -f $note_path ]]; then
-    echo "Note already exists"
-    return
+    echo "Note already exists" >&2
+    return 1
   fi
 
   touch $note_path
@@ -61,46 +63,71 @@ date_with_suffix() {
   echo "$(date +"%A %B $day")${suffix} $(date +"%Y")"
 }
 
-function daily_note() {
+daily_note() {
   if [[ ! -z $1 || $1 = 0 ]]; then
-    entry=$((1 - $1))
+    if ! [[ "$1" =~ ^[-+]?[0-9]+$ ]]; then
+      echo "Error: Argument must be a number" >&2
+      return 1
+    fi
+
+    local entry=$((1 - $1))
     if [[ $1 > 0 ]]; then
       entry=$((1 + $1))
     fi
     entry_name=$(ls -t $NOTES_DAILY_DIR/ | head -n $entry | tail -n 1)
     vim "$NOTES_DAILY_DIR/$entry_name"
   else
+    local tmp_file
+    tmp_file=$(mktemp) || {
+      echo "Failed to create temp file" >&2
+      return 1
+    }
+    trap 'rm -f "${tmp_file}"' EXIT
+
     local note_path=$NOTES_DAILY_DIR/$(date +"%Y-%m-%d-%A").md
+
     if [[ -f $note_path ]]; then
       vim $note_path
     else
-      last_daily=$(ls -t $NOTES_DAILY_DIR/ | grep -v "template" | head -n 1)
+      last_daily="$(ls -t "${NOTES_DAILY_DIR}/" | grep -v "template" | head -n 1)"
       cp -f $NOTES_DAILY_TEMPLATE $note_path
       sed -i '' "s/TEMPLATE_DATE/$(date_with_suffix)/" $note_path
 
-      sed -n '/^### Carry-over$/,/^## Log$/p' "$NOTES_DAILY_DIR/$last_daily" | sed '1d;$d;/^$/d' >$CARRY_OVER_TMP_FILE
+      sed -n '/^### Carry-over$/,/^## Log$/p' "$NOTES_DAILY_DIR/$last_daily" | sed '1d;$d;/^$/d' >$tmp_file
       sed -i '' "/TEMPLATE_CARRY_OVER/{
-      r $CARRY_OVER_TMP_FILE
+      r $tmp_file
       d
       }" $note_path
-      rm $CARRY_OVER_TMP_FILE
+      rm $tmp_file
 
       vim $note_path
     fi
   fi
 }
 
-function bucket_note() {
+bucket_note() {
+  [[ $# -eq 0 ]] && {
+    echo "Error: No arguments provided" >&2
+    return 1
+  }
   local note_path=$NOTES_BUCKET_DIR/$(date +"%Y/%m").md
 
   if [[ ! -f $note_path ]]; then
-    mkdir -p $(dirname $note_path)
+    mkdir -p "$(dirname "${note_path}")" || {
+      echo "Error: Could not create directory" >&2
+      return 1
+    }
     echo "# Bucket notes $(date +"%Y-%m")\n" >$note_path
   fi
 
-  if [[ $1 != $NOTES_BUCKET_CMD_READ ]]; then
-    echo -n "- [ $(date +"%Y-%m-%d %H:%M") ] " >>$note_path
-    echo "$@" >>$note_path
+  if [[ "$1" != "${NOTES_BUCKET_CMD_READ}" ]]; then
+    {
+      printf -- "- [ %s ] " "$(date +"%Y-%m-%d %H:%M")"
+      printf "%s\n" "$*"
+    } >>"${note_path}" || {
+      echo "Error: Failed to write to note" >&2
+      return 1
+    }
   fi
 
   if [[ -z $1 || $1 == $NOTES_BUCKET_CMD_READ ]]; then
