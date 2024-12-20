@@ -31,12 +31,21 @@ fi
 
 notes() {
   case "$1" in
+  "${NOTES_CMD_READ}") read_notes "${@:2}" ;;
   "${NOTES_CMD_NEW}") new_note "$2" ;;
   "${NOTES_CMD_SEARCH}") search_notes_with_fzf ;;
   "${NOTES_CMD_FIND}") find_notes_with_fzf ;;
   "${NOTES_CMD_DAILY}") daily_note "$2" ;;
   "${NOTES_CMD_BUCKET}") bucket_note "${@:2}" ;;
   *) echo "Unknown command: $1" ;;
+  esac
+}
+
+read_notes() {
+  case "$1" in
+  "${NOTES_CMD_BUCKET}") bucket_read_note "$2" ;;
+  "${NOTES_CMD_DAILY}") daily_note 0 ;;
+  *) ls -t ${NOTES_BASE_DIR}/*/* | head -n 1 | xargs -n 1 nvim ;;
   esac
 }
 
@@ -112,32 +121,45 @@ daily_note() {
 }
 
 bucket_note() {
-  [[ $# -eq 0 ]] && {
-    echo "Error: No arguments provided" >&2
-    return 1
-  }
   local note_path=$NOTES_BUCKET_DIR/$(date +"%Y/%m").md
 
-  if [[ ! -f $note_path ]]; then
-    mkdir -p "$(dirname "${note_path}")" || {
+  bucket_note_create_if_not_exist "$note_path"
+  bucket_append_note "$note_path" "$*"
+  bucket_open "$note_path" "$1"
+}
+
+bucket_read_note() {
+  local note_path=$NOTES_BUCKET_DIR/$(date +"%Y/%m").md
+
+  bucket_note_create_if_not_exist "$note_path"
+  bucket_open "$note_path" "$1"
+}
+
+bucket_note_create_if_not_exist() {
+  if [[ ! -f $1 ]]; then
+    mkdir -p "$(dirname "${1}")" || {
       echo "Error: Could not create directory" >&2
       return 1
     }
-    echo "# Bucket notes $(date +"%Y-%m")\n" >$note_path
+    echo "# Bucket notes $(date +"%Y-%m")\n" >$1
   fi
+}
 
-  if [[ "$1" != "${NOTES_BUCKET_CMD_READ}" ]]; then
+bucket_append_note() {
+  if [[ "$2" != "${NOTES_BUCKET_CMD_READ}" ]]; then
     {
       printf -- "- [ %s ] " "$(date +"%Y-%m-%d %H:%M")"
-      printf "%s\n" "$*"
-    } >>"${note_path}" || {
+      printf "%s\n" "${@:2}"
+    } >>"$1" || {
       echo "Error: Failed to write to note" >&2
       return 1
     }
   fi
+}
 
-  if [[ -z $1 || $1 == $NOTES_BUCKET_CMD_READ ]]; then
-    vim "+ normal GA" $note_path
+bucket_open() {
+  if [[ -z $2 || $2 == $NOTES_BUCKET_CMD_READ ]]; then
+    vim "+ normal GA" $1
   fi
 }
 
