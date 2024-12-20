@@ -1,6 +1,4 @@
 #!/bin/bash
-set -euo pipefail
-IFS=$'\n\t'
 
 # Get the directory of the current script
 readonly SCRIPT_DIR="$(dirname "$(realpath "$0")}")" || {
@@ -10,6 +8,14 @@ readonly SCRIPT_DIR="$(dirname "$(realpath "$0")}")" || {
 
 # Define the path to the configuration file and source it
 readonly CONFIG_FILE="${SCRIPT_DIR}/.config"
+
+main() {
+  # Set strict mode only when executing commands, not when sourcing
+  set -euo pipefail
+  IFS=$'\n\t'
+
+  notes "$@"
+}
 
 if [[ -f "$CONFIG_FILE" ]]; then
   source "$CONFIG_FILE"
@@ -134,3 +140,8 @@ bucket_note() {
     vim "+ normal GA" $note_path
   fi
 }
+
+# Call main only if the script is being executed, not sourced
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi
