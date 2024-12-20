@@ -1,0 +1,11 @@
+# Notes directories
+NOTES_DIR="${HOME}/notes"
+NOTES_DAILY_DIR="${NOTES_DIR}/daily"
+NOTES_BUCKET_DIR="${NOTES_DIR}/bucket"
+NOTES_MISC_DIR="${NOTES_DIR}/misc"
+
+# Templates
+NOTES_DAILY_TEMPLATE="${PREFIX}/share/notes/templates/daily.md"
+
+# Editor
+EDITOR="${EDITOR:-vim}"

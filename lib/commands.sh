@@ -1,44 +1,55 @@
-#!/bin/bash
-
-# Get the directory of the current script
-readonly SCRIPT_DIR="$(dirname "$(realpath "$0")}")" || {
-  echo "Error: Could not determine script directory" >&2
-  exit 1
-}
-
-# Define the path to the configuration file and source it
-readonly CONFIG_FILE="${SCRIPT_DIR}/.config"
-
-main() {
-  # Set strict mode only when executing commands, not when sourcing
-  set -euo pipefail
-  IFS=$'\n\t'
-
-  notes "$@"
-}
-
-if [[ -f "$CONFIG_FILE" ]]; then
-  source "$CONFIG_FILE"
-else
-  echo "Configuration file for notes was not found: $CONFIG_FILE"
-  exit 1
-fi
-
-if [[ ! -f "$NOTES_DAILY_TEMPLATE" ]]; then
-  echo "Couldn't find daily notes template at: $NOTES_DAILY_TEMPLATE"
-  exit 1
-fi
+#!/usr/bin/env bash
 
 notes() {
   case "$1" in
-  "${NOTES_CMD_READ}") read_notes "${@:2}" ;;
-  "${NOTES_CMD_NEW}") new_note "$2" ;;
-  "${NOTES_CMD_SEARCH}") search_notes_with_fzf ;;
-  "${NOTES_CMD_FIND}") find_notes_with_fzf ;;
-  "${NOTES_CMD_DAILY}") daily_note "$2" ;;
-  "${NOTES_CMD_BUCKET}") bucket_note "${@:2}" ;;
-  *) echo "Unknown command: $1" ;;
+  new)
+    shift
+    new_note "$@"
+    ;;
+  daily)
+    shift
+    daily_note "$@"
+    ;;
+  bucket)
+    shift
+    bucket_note "$@"
+    ;;
+  read)
+    shift
+    read_notes "$@"
+    ;;
+  search)
+    shift
+    search_notes_with_fzf "$@"
+    ;;
+  find)
+    shift
+    find_notes_with_fzf "$@"
+    ;;
+  help | --help | -h) show_help ;;
+  *)
+    show_help
+    return 1
+    ;;
   esac
+}
+
+show_help() {
+  cat <<EOF
+Usage: notes COMMAND [OPTIONS]
+
+Commands:
+    new     Create a new note
+    daily   Manage daily notes
+    bucket  Manage bucket notes
+    read    Read recent notes
+    search  Search through notes
+    find    Find notes
+    help    Show this help message
+
+For more information about a command:
+    notes COMMAND --help
+EOF
 }
 
 read_notes() {
@@ -162,8 +173,3 @@ bucket_open() {
     vim "+ normal GA" $1
   fi
 }
-
-# Call main only if the script is being executed, not sourced
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  main "$@"
-fi

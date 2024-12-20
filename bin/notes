@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+# Resolve the directory where the script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_DIR="$(cd "${SCRIPT_DIR}/../lib" && pwd)"
+SHARE_DIR="$(cd "${SCRIPT_DIR}/../share" && pwd)"
+
+# Source dependencies
+source "${LIB_DIR}/config.sh"
+source "${LIB_DIR}/utils.sh"
+source "${LIB_DIR}/commands.sh"
+
+main() {
+  set -euo pipefail
+  IFS=$'\n\t'
+
+  # Ensure at least one argument is provided
+  if [[ $# -eq 0 ]]; then
+    show_help
+    exit 1
+  fi
+
+  # Load configuration
+  load_config || exit 1
+
+  # Execute command
+  notes "$@"
+}
+
+main "$@"
