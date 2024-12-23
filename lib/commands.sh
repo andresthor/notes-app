@@ -133,8 +133,7 @@ bucket_note() {
 
   bucket_note_create_if_not_exist "$note_path"
   timestamp=$(printf -- "- [ %s ]" "$(date +"%Y-%m-%d %H:%M")")
-  note="$timestamp ${1:-}"
-  bucket_open "$note_path" $note
+  bucket_append "$note_path" "$timestamp" "${1:-}"
 }
 
 bucket_read_note() {
@@ -154,12 +153,18 @@ bucket_note_create_if_not_exist() {
   fi
 }
 
-bucket_open() {
-  note="${2:-}"
-  if [[ ! -z "$note" ]]; then
-    note="\"normal a\<CR>$2\""
+bucket_append() {
+  local note="${3:-}"
+  local cmd_str="\"normal a\<CR>$2 \""
+  if [[ -z "$note" ]]; then
+    bucket_open "$1" "$cmd_str"
+  else
+    echo "$2 $note" >>$1
   fi
-  $EDITOR '+ normal G$' -c ":exe ${note}" "$1"
+}
+
+bucket_open() {
+  $EDITOR '+ normal G$' -c ":exe ${2:-}" "$1"
 }
 
 search_notes_with_fzf() {
